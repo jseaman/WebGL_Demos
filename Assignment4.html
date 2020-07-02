@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script id="vertex-shader" type="x-shader/x-vertex">
+
+// assume both position and normal are in homogeneous form
+
+const int MAX_LIGHTS = 10;
+
+attribute vec4 vPosition;
+attribute vec4 vNormal;
+
+varying vec4 fColor;
+
+
+uniform mat4 modelViewMatrix;
+uniform mat4 projectionMatrix;
+uniform float shininess;
+uniform mat3 normalMatrix;
+
+struct lightStruct
+{
+	vec4 ambientProduct, diffuseProduct, specularProduct;
+	vec4 lightPosition;
+};
+
+uniform lightStruct lightSources[MAX_LIGHTS];
+uniform int lightCount;
+
+void
+main()
+{
+
+    // pos is vertex position in eye coordinates
+
+    vec3 pos = (modelViewMatrix * vPosition).xyz;
+
+    // Because the eye point the is at the orgin
+    // the vector from the vertex position to the eye is
+
+    vec3 E = -normalize( pos );
+
+    // Transform vertex normal into eye coordinates
+
+    vec3 N = normalize( normalMatrix*vNormal.xyz);
+
+    fColor = vec4(0.0,0.0,0.0,1.0);
+
+    for (int i=0;i<MAX_LIGHTS;i++)
+    {
+    	if (i>=lightCount)
+    		continue;
+
+    	// vector from vertex position to light source
+
+    	vec3 L;
+
+    	// check for directional light
+
+	    if(lightSources[i].lightPosition.w == 0.0) 
+	    	L = normalize(lightSources[i].lightPosition.xyz);
+	    else 
+	    	L = normalize( lightSources[i].lightPosition.xyz - pos );    
+
+    	// halfway vector
+
+    	vec3 H = normalize( L + E );
+
+    	// Compute terms in the illumination equation
+    	vec4 ambient = lightSources[i].ambientProduct;
+
+    	float Kd = max( dot(L, N), 0.0 );
+    	vec4  diffuse = Kd*lightSources[i].diffuseProduct;
+
+    	float Ks = pow( max(dot(N, H), 0.0), shininess );
+    	vec4  specular = Ks * lightSources[i].specularProduct;
+
+    	if( dot(L, N) < 0.0 ) 
+			specular = vec4(0.0, 0.0, 0.0, 1.0);
+
+		fColor += ambient + diffuse +specular;
+	}
+
+    gl_Position = projectionMatrix * modelViewMatrix * vPosition;
+
+    fColor.a = 1.0;
+}
+
+</script>
+
+<script id="fragment-shader" type="x-shader/x-fragment">
+precision mediump float;
+
+varying vec4 fColor;
+
+void
+main()
+{
+    gl_FragColor = fColor;
+}
+</script>
+
+<script type="text/javascript" src="../Common/webgl-utils.js"></script>
+<script type="text/javascript" src="../Common/initShaders.js"></script>
+<script type="text/javascript" src="../Common/MV.js"></script>
+<script type="text/javascript" src="Assignment4.js"></script>
+
+<style type="text/css">
+	transformations 
+	{
+		margin-top: -60px;
+		margin-left: 80px;
+	}
+</style>
+
+</head>
+
+<body>
+<canvas id="gl-canvas" width="800" height="600">
+Oops ... your browser doesn't support the HTML5 canvas element
+</canvas>
+
+<div style="margin-top: -600px; margin-left: 802px">
+	<div>
+		<input id="ConeButton" type="button" value="Cone">
+		<input id="CylinderButton" type="button" value="Cylinder">
+		<input id="SphereButton" type="button" value="Sphere">
+		<input id="LightButton" type="button" value="Light">
+	</div>
+	<div id="TransformDiv" style="display: none">
+		<div id="RotationDiv">
+			Rotation
+			<div class="slider">
+				X:  <input id="RotXSlider" type="range"
+				 min="0" max="360" step="1" value="0" />
+			</div>
+			<div class="slider">
+				Y:  <input id="RotYSlider" type="range"
+				 min="0" max="360" step="1" value="0" />
+			</div>
+			<div class="slider">
+				Z:  <input id="RotZSlider" type="range"
+				 min="0" max="360" step="1" value="0" />
+			</div>
+		</div>
+		<div>
+			Translation
+			<div class="slider">
+				X:  <input id="TransXSlider" type="range"
+				 min="-2" max="2" step="0.1" value="0" />
+			</div>
+			<div class="slider">
+				Y:  <input id="TransYSlider" type="range"
+				 min="-2" max="2" step="0.1" value="0" />
+			</div>
+			<div class="slider">
+				Z:  <input id="TransZSlider" type="range"
+				 min="-2" max="2" step="0.1" value="0" />
+			</div>
+		</div>
+		<div id="ScaleDiv">
+			Scale
+			<div class="slider">
+				X:  <input id="ScaleXSlider" type="range"
+				 min="0.1" max="1" step="0.1" value="0.3" />
+			</div>
+			<div class="slider">
+				Y:  <input id="ScaleYSlider" type="range"
+				 min="0.1" max="1" step="0.1" value="0.3" />
+			</div>
+			<div class="slider">
+				Z:  <input id="ScaleZSlider" type="range"
+				 min="0.1" max="1" step="0.1" value="0.3" />
+			</div>
+		</div>
+		<div id="MaterialDiv">
+			<div id="LightingDescription">Material Parameters</div>
+			<div>
+				Ambient: <br>
+				R <input id="MaterialAmbientRInput" type="text" value="0" size="3" />
+				G <input id="MaterialAmbientGInput" type="text" value="0" size="3" />
+				B <input id="MaterialAmbientBInput" type="text" value="0" size="3" />
+			</div>
+			<div>
+				Diffuse: <br>
+				R <input id="MaterialDiffuseRInput" type="text" value="0" size="3" />
+				G <input id="MaterialDiffuseGInput" type="text" value="0" size="3" />
+				B <input id="MaterialDiffuseBInput" type="text" value="0" size="3" />
+			</div>
+			<div>
+				Specular: <br>
+				R <input id="MaterialSpecularRInput" type="text" value="0" size="3" />
+				G <input id="MaterialSpecularGInput" type="text" value="0" size="3" />
+				B <input id="MaterialSpecularBInput" type="text" value="0" size="3" />
+			</div>
+			<div id="ShininessDiv">
+				Shininess: <input id="MaterialShininessInput" type="text" value="0" size="3" />
+			</div>
+			<div id="AnimateDiv">
+				Animate <input id="AnimateCheckbox" type="checkbox" />
+			</div>
+			<div id="LightSwitchDiv">
+				Light switch: <input id="LightSwitchCheckbox" type="checkbox" checked="true"/>
+			</div>
+		</div>
+	</div>
+	
+	<div>
+		<br />
+		Objects :  
+		<select id="objListBox" style="width:100px">
+		</select>
+	</div>
+	
+	<div>
+		<br />
+		Add some objects and lights. To animate a light first move it away from the origin. Make sure to uncheck the "animate" checkbox to change the light's properties.
+	</div>
+</div>
+
+
+</body>
+</html>
